@@ -34,6 +34,19 @@ export async function POST(request) {
   const runId = await logPipelineRun(supabase, { runType: "analyze", status: "running" });
   const startTime = Date.now();
 
+  // Clean up clubs from non-target leagues
+  const targetLeagueNames = TARGET_LEAGUES.map((l) => l.name);
+  const { data: staleClubs } = await supabase
+    .from("clubs")
+    .select("id")
+    .not("league", "in", `(${targetLeagueNames.join(",")})`);
+  if (staleClubs?.length > 0) {
+    const staleIds = staleClubs.map((c) => c.id);
+    await supabase.from("opportunities").delete().in("club_id", staleIds);
+    await supabase.from("squad_snapshots").delete().in("club_id", staleIds);
+    await supabase.from("clubs").delete().in("id", staleIds);
+  }
+
   let squadsFetched = 0;
   let squadsSkipped = 0;
   let squadsFailed = 0;
