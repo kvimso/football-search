@@ -156,13 +156,12 @@ export default function Dashboard({ opportunities, initialTags, fallbackMode, in
     setRefreshState("analyzing");
     setRefreshError(null);
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await fetch("/api/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force: true }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Analysis failed");
+      if (!res.ok) throw new Error(data.error || "Refresh failed");
       router.refresh();
       setRefreshState("idle");
     } catch (err) {
