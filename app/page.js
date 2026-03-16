@@ -3,6 +3,9 @@ import { SAMPLE_CLUBS } from "../lib/sample-data.js";
 import { getFallbackAnalysis } from "../lib/fallback-analyzer.js";
 import Dashboard from "../components/Dashboard.js";
 
+// Don't cache — always fetch fresh data from Supabase
+export const dynamic = "force-dynamic";
+
 function getFallbackData() {
   const opportunities = SAMPLE_CLUBS.flatMap((club) => {
     const gaps = getFallbackAnalysis(club);
