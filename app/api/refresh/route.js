@@ -3,7 +3,7 @@ import { getSupabaseServerClient, isSupabaseConfigured } from "../../../lib/supa
 import { isApiFootballConfigured, getCurrentSeason } from "../../../lib/api-football.js";
 import { fetchTeamsForLeague, fetchSquadForTeam, upsertClubAndSnapshot } from "../../../lib/data-pipeline.js";
 import { loadClubsWithSnapshots, storeOpportunities } from "../../../lib/analysis-pipeline.js";
-import { analyzeBatchWithGemini } from "../../../lib/gemini-analyzer.js";
+import { analyzeBatch } from "../../../lib/ai-analyzer.js";
 import { logPipelineRun, updatePipelineRun } from "../../../lib/pipeline-logger.js";
 import { TARGET_LEAGUES } from "../../../lib/sample-data.js";
 
@@ -100,7 +100,7 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
-    const results = await analyzeBatchWithGemini(clubs);
+    const results = await analyzeBatch(clubs);
 
     for (const result of results) {
       const club = clubs.find((c) => c.name === result.club_name);
@@ -124,14 +124,14 @@ export async function POST(request) {
       error_log: errors.length > 0 ? errors : null,
     });
 
-    const sources = [...new Set(results.map((r) => r.source))];
+    const source = results[0]?.error ? "heuristic" : "claude";
     return NextResponse.json({
       status: finalStatus,
       squads_fetched: squadsFetched,
       squads_fresh: squadsSkipped === -1,
       clubs_analyzed: clubsAnalyzed,
       opportunities_count: totalOpportunities,
-      analysis_source: sources.join(", "),
+      analysis_source: source,
       duration_ms: Date.now() - startTime,
     });
   } catch (err) {
