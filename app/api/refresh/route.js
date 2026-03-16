@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient, isSupabaseConfigured } from "../../../lib/supabase.js";
 import { isApiFootballConfigured, getCurrentSeason } from "../../../lib/api-football.js";
 import { fetchTeamsForLeague, fetchSquadForTeam, upsertClubAndSnapshot } from "../../../lib/data-pipeline.js";
-import { loadClubsWithSnapshots, storeOpportunities } from "../../../lib/analysis-pipeline.js";
+import { loadClubsWithSnapshots, batchStoreOpportunities } from "../../../lib/analysis-pipeline.js";
 import { analyzeBatch } from "../../../lib/ai-analyzer.js";
 import { logPipelineRun, updatePipelineRun } from "../../../lib/pipeline-logger.js";
 import { TARGET_LEAGUES } from "../../../lib/sample-data.js";
@@ -102,18 +102,21 @@ export async function POST(request) {
 
     const results = await analyzeBatch(clubs);
 
+    // Batch store all opportunities in 2 DB calls instead of 24
+    const clubResults = [];
     for (const result of results) {
       const club = clubs.find((c) => c.name === result.club_name);
-      if (!club) continue;
+      if (!club || !result.gaps?.length) continue;
+      clubResults.push({ clubDbId: club.db_id, snapshotId: club.snapshot_id, gaps: result.gaps });
+      clubsAnalyzed++;
+      totalOpportunities += result.gaps.length;
+    }
 
-      try {
-        await storeOpportunities(supabase, club.db_id, club.snapshot_id, result.gaps);
-        clubsAnalyzed++;
-        totalOpportunities += result.gaps.length;
-      } catch (err) {
-        errors.push({ club: club.name, error: err.message });
-        analysisFailed++;
-      }
+    try {
+      await batchStoreOpportunities(supabase, clubResults);
+    } catch (err) {
+      errors.push({ error: err.message });
+      analysisFailed = clubResults.length;
     }
 
     const finalStatus = analysisFailed > 0 ? "partial" : "completed";
