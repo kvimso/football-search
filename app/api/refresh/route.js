@@ -30,7 +30,7 @@ export async function POST(request) {
     .update({ status: "failed", error_log: [{ fatal: "Timed out after 30 minutes" }] })
     .eq("run_type", "analyze")
     .eq("status", "running")
-    .lt("started_at", new Date(Date.now() - 30 * 60 * 1000).toISOString());
+    .lt("started_at", new Date(Date.now() - 2 * 60 * 1000).toISOString());
 
   const { data: running } = await supabase
     .from("pipeline_runs")
