@@ -124,14 +124,14 @@ export async function POST(request) {
       error_log: errors.length > 0 ? errors : null,
     });
 
-    const source = results[0]?.error ? "heuristic" : "claude";
+    const sources = [...new Set(results.map((r) => r.source).filter(Boolean))];
     return NextResponse.json({
       status: finalStatus,
       squads_fetched: squadsFetched,
       squads_fresh: squadsSkipped === -1,
       clubs_analyzed: clubsAnalyzed,
       opportunities_count: totalOpportunities,
-      analysis_source: source,
+      analysis_source: sources.join(", ") || "unknown",
       duration_ms: Date.now() - startTime,
     });
   } catch (err) {
