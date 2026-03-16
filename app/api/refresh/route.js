@@ -24,23 +24,12 @@ export async function POST(request) {
     return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY not configured" }, { status: 503 });
   }
 
-  // Check for concurrent runs
+  // Clear any stuck "running" rows — Vercel functions max out at 60s,
+  // so any "running" row is guaranteed stale
   await supabase
     .from("pipeline_runs")
-    .update({ status: "failed", error_log: [{ fatal: "Timed out after 30 minutes" }] })
-    .eq("run_type", "analyze")
-    .eq("status", "running")
-    .lt("started_at", new Date(Date.now() - 2 * 60 * 1000).toISOString());
-
-  const { data: running } = await supabase
-    .from("pipeline_runs")
-    .select("id")
-    .eq("status", "running")
-    .limit(1);
-
-  if (running && running.length > 0) {
-    return NextResponse.json({ error: "Refresh already in progress" }, { status: 409 });
-  }
+    .update({ status: "failed", error_log: [{ fatal: "Cleared stale run" }] })
+    .eq("status", "running");
 
   const runId = await logPipelineRun(supabase, { runType: "analyze", status: "running" });
   const startTime = Date.now();
