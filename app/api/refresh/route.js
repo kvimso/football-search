@@ -124,12 +124,14 @@ export async function POST(request) {
       error_log: errors.length > 0 ? errors : null,
     });
 
+    const sources = [...new Set(results.map((r) => r.source))];
     return NextResponse.json({
       status: finalStatus,
       squads_fetched: squadsFetched,
       squads_fresh: squadsSkipped === -1,
       clubs_analyzed: clubsAnalyzed,
       opportunities_count: totalOpportunities,
+      analysis_source: sources.join(", "),
       duration_ms: Date.now() - startTime,
     });
   } catch (err) {
