@@ -38,9 +38,16 @@ export async function POST(request) {
   let squadsSkipped = 0;
   let squadsFailed = 0;
 
-  // --- Phase 1: Fetch squads if stale (within time budget) ---
+  // --- Phase 1: Fetch squads if stale or missing leagues ---
   if (isApiFootballConfigured()) {
-    // Check how fresh our squad data is
+    // Check which target leagues we already have clubs for
+    const { data: existingClubs } = await supabase
+      .from("clubs")
+      .select("league");
+    const existingLeagues = new Set((existingClubs || []).map((c) => c.league));
+    const missingLeagues = TARGET_LEAGUES.filter((l) => !existingLeagues.has(l.name));
+
+    // Check freshness of existing data
     const { data: latestSnapshot } = await supabase
       .from("squad_snapshots")
       .select("snapshot_date")
@@ -52,10 +59,14 @@ export async function POST(request) {
       ? (Date.now() - new Date(latestDate).getTime()) / (1000 * 60 * 60)
       : Infinity;
 
-    if (squadsAgeHours > SQUAD_MAX_AGE_HOURS) {
+    const needsFetch = squadsAgeHours > SQUAD_MAX_AGE_HOURS || missingLeagues.length > 0;
+
+    if (needsFetch) {
+      // Fetch missing leagues first, then stale ones
+      const leaguesToFetch = missingLeagues.length > 0 ? missingLeagues : TARGET_LEAGUES;
       const season = getCurrentSeason();
 
-      for (const league of TARGET_LEAGUES) {
+      for (const league of leaguesToFetch) {
         // Time check — stop fetching if we're running out of time
         if (Date.now() - startTime > FETCH_TIME_BUDGET_MS) break;
 
