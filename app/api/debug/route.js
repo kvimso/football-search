@@ -1,35 +1,28 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "../../../lib/supabase.js";
-import { loadClubsWithSnapshots } from "../../../lib/analysis-pipeline.js";
-import { analyzeBatch } from "../../../lib/ai-analyzer.js";
+import { getSupabaseServerClient, isSupabaseConfigured } from "../../../lib/supabase.js";
 
 export async function GET() {
-  try {
-    const supabase = getSupabaseServerClient();
-    const clubs = await loadClubsWithSnapshots(supabase);
-
-    // Test with just 2 clubs to save time
-    const testClubs = clubs.slice(0, 2);
-    const clubInfo = testClubs.map((c) => ({
-      name: c.name,
-      league: c.league,
-      squadSize: c.squad?.length,
-      samplePlayers: c.squad?.slice(0, 3).map((p) => `${p.name} (${p.position})`),
-    }));
-
-    const results = await analyzeBatch(testClubs);
-
-    return NextResponse.json({
-      clubs_loaded: clubs.length,
-      test_clubs: clubInfo,
-      results: results.map((r) => ({
-        club: r.club_name,
-        source: r.source,
-        gaps_count: r.gaps?.length,
-        gaps: r.gaps,
-      })),
-    });
-  } catch (err) {
-    return NextResponse.json({ error: err.message, stack: err.stack?.split("\n").slice(0, 5) });
+  const configured = isSupabaseConfigured();
+  if (!configured) {
+    return NextResponse.json({ error: "Supabase not configured", configured });
   }
+
+  const supabase = getSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "No server client" });
+  }
+
+  const { data: opportunities, error } = await supabase
+    .from("opportunities")
+    .select(`id, position, urgency, budget_tier, reason, is_active, clubs!inner(id, name, league, country)`)
+    .eq("is_active", true)
+    .order("urgency", { ascending: false })
+    .limit(5);
+
+  return NextResponse.json({
+    configured,
+    error: error?.message || null,
+    count: opportunities?.length || 0,
+    sample: opportunities?.slice(0, 3),
+  });
 }
