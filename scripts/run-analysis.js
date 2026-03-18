@@ -9,7 +9,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { getSupabaseServerClient, isSupabaseConfigured } from "../lib/supabase.js";
-import { analyzeBatchWithGemini } from "../lib/gemini-analyzer.js";
+import { analyzeBatch } from "../lib/ai-analyzer.js";
 import { SAMPLE_CLUBS } from "../lib/sample-data.js";
 import { logPipelineRun, updatePipelineRun } from "../lib/pipeline-logger.js";
 import { loadClubsWithSnapshots, storeOpportunities } from "../lib/analysis-pipeline.js";
@@ -64,8 +64,8 @@ async function main() {
   const errors = [];
 
   try {
-    // Run Gemini batch analysis
-    const results = await analyzeBatchWithGemini(clubs);
+    // Run AI batch analysis (Claude → Gemini → Heuristic)
+    const results = await analyzeBatch(clubs);
 
     // Store results
     for (const result of results) {
